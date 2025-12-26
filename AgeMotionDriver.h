@@ -82,6 +82,13 @@ public:
 
     // 注意：这里现在的单位是 微米 (μm)
     bool getPosition(double &positionUm);
+    
+    // 新增功能函数
+    bool getVelocity(double &rpm);
+    bool setTargetVelocity(double rpm);
+    bool moveToPosition(double positionUm);
+    bool stopMotion();
+    int checkError();
 
     QString getLastError() const;
 
@@ -91,8 +98,8 @@ private:
     // ==========================================
 
     // 1. 物理参数
-    // 定义：多少个脉冲等于 1 毫米 (根据你的之前的代码 16000 pulses = 1mm)
-    static constexpr double PULSES_PER_UM = 16000.0;
+    // 定义：多少个脉冲等于 1 微米
+    static constexpr double PULSES_PER_UM = 1600.0;
 
     // 2. 通信参数
     // 站号 (RTU Address)
@@ -106,7 +113,7 @@ private:
 
     // 4. 路径与授权 (使用 constexpr char* 确保在头文件中定义且无链接错误)
     static constexpr const char* DLL_RELATIVE_PATH = "/AgeMotionForDriver/x64/AgeCOM.dll";
-
+    static constexpr const char* DLL_ABS_PATH = "D:/Project/Git/Git/AutoFocus/AgeMotionForDriver/x64/AgeCOM.dll";
     static constexpr const char* LICENSE_KEY =
         "AgeMotion-20010203-00000000-0000-0000-0000-0000-0000-0000-0000-0000-"
         "0000-0000-0000-0000-0000-0000-0000-0000-0000-0000";

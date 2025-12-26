@@ -45,7 +45,10 @@ bool AgeMotionDriver::connectDevice()
 bool AgeMotionDriver::loadLibrary()
 {
     // 使用头文件中定义的 DLL_RELATIVE_PATH
-    QString dllPath = QCoreApplication::applicationDirPath() + DLL_RELATIVE_PATH;
+    // QString dllPath = QCoreApplication::applicationDirPath() + DLL_RELATIVE_PATH;
+    // m_lib.setFileName(dllPath);
+
+    QString dllPath = DLL_ABS_PATH;
     m_lib.setFileName(dllPath);
 
     if (!m_lib.load()) {
@@ -60,9 +63,15 @@ bool AgeMotionDriver::loadLibrary()
     m_api_readQWORD = (AgeCOMReadQWORDFunc)m_lib.resolve("AgeCOMReadQWORD");
     m_api_getCOMID  = (AgeCOMGetCOMIDFunc)m_lib.resolve("AgeCOMGetCOMID");
     m_api_setSerial = (AgeCOMSerialFunc)m_lib.resolve("AgeCOMSerial");
+    
+    // 新增函数指针解析
+    m_api_readWORD   = (AgeCOMReadWORDFunc)m_lib.resolve("AgeCOMReadWORD");
+    m_api_writeWORD  = (AgeCOMWriteWORDFunc)m_lib.resolve("AgeCOMWriteWORD");
+    m_api_writeQWORD = (AgeCOMWriteQWORDFunc)m_lib.resolve("AgeCOMWriteQWORD");
 
-    // 校验
-    if (!m_api_isValid || !m_api_readQWORD || !m_api_setSerial) {
+    // 校验 (注意：根据实际情况，有些函数可能不是必须的，但为了完整性建议都校验)
+    if (!m_api_isValid || !m_api_readQWORD || !m_api_setSerial || 
+        !m_api_readWORD || !m_api_writeWORD || !m_api_writeQWORD) {
         m_lastError = "Failed to resolve one or more functions from DLL.";
         qCritical() << m_lastError;
         return false;
@@ -98,10 +107,6 @@ bool AgeMotionDriver::getPosition(double &positionUm)
         long long signedPulses = (long long)rawPos;
 
         // 2. 转换为微米
-        // 公式： 脉冲数 / (每毫米脉冲数 / 1000.0)
-        // 解析： 16000 脉冲 = 1 um
-        //       所以：微米 = 脉冲 / 16000.0
-
         positionUm = (double)signedPulses / (PULSES_PER_UM);
 
         return true;
@@ -111,69 +116,69 @@ bool AgeMotionDriver::getPosition(double &positionUm)
     }
 }
 
-// // --- 获取实时速度 (RPM) ---
-// bool AgeMotionDriver::getVelocity(double &rpm)
-// {
-//     if (!m_isConnected || !m_api_readWORD) return false;
+// --- 获取实时速度 (RPM) ---
+bool AgeMotionDriver::getVelocity(double &rpm)
+{
+    if (!m_isConnected || !m_api_readWORD) return false;
 
-//     WORD rawVel = 0;
-//     // 读取实时速度寄存器 0x0045
-//     if (m_api_readWORD(STATION_ID, AgeReg::ADDR_VEL_REAL, rawVel, TIMEOUT_MS)) {
-//         // 转换公式: RPM = (5 * raw) / 16 (根据手册 4.4.26)
-//         short signedVel = (short)rawVel; // 转为有符号
-//         rpm = (signedVel * 5.0) / 16.0;
-//         return true;
-//     }
-//     return false;
-// }
+    WORD rawVel = 0;
+    // 读取实时速度寄存器 0x0045
+    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_VEL_REAL, rawVel, TIMEOUT_MS)) {
+        // 转换公式: RPM = (5 * raw) / 16 (根据手册 4.4.26)
+        short signedVel = (short)rawVel; // 转为有符号
+        rpm = (signedVel * 5.0) / 16.0;
+        return true;
+    }
+    return false;
+}
 
-// // --- 设置目标运行速度 (RPM) ---
-// bool AgeMotionDriver::setTargetVelocity(double rpm)
-// {
-//     if (!m_isConnected || !m_api_writeWORD) return false;
+// --- 设置目标运行速度 (RPM) ---
+bool AgeMotionDriver::setTargetVelocity(double rpm)
+{
+    if (!m_isConnected || !m_api_writeWORD) return false;
 
-//     // 转换公式: VelSet = (16 * RPM) / 5 (根据手册 4.4.21)
-//     // 注意: VelSet 值域 1~38400
-//     unsigned short val = (unsigned short)((rpm * 16.0) / 5.0);
+    // 转换公式: VelSet = (16 * RPM) / 5 (根据手册 4.4.21)
+    // 注意: VelSet 值域 1~38400
+    unsigned short val = (unsigned short)((rpm * 16.0) / 5.0);
 
-//     // 写入速度设定寄存器 0x0040
-//     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_VEL_SET, val, TIMEOUT_MS);
-// }
+    // 写入速度设定寄存器 0x0040
+    return m_api_writeWORD(STATION_ID, AgeReg::ADDR_VEL_SET, val, TIMEOUT_MS);
+}
 
-// // --- 绝对运动到指定位置 (微米) ---
-// bool AgeMotionDriver::moveToPosition(double positionUm)
-// {
-//     if (!m_isConnected || !m_api_writeQWORD) return false;
+// --- 绝对运动到指定位置 (微米) ---
+bool AgeMotionDriver::moveToPosition(double positionUm)
+{
+    if (!m_isConnected || !m_api_writeQWORD) return false;
 
-//     // 1. 将微米转换为脉冲/微步 (MMS)
-//     // 假设 16000 MMS = 1 mm = 1000 um -> 1 um = 16 MMS
-//     long long mms = (long long)(positionUm * (PULSES_PER_MM / 1000.0));
+    // 1. 将微米转换为脉冲/微步 (MMS)
+    // 1 um = PULSES_PER_UM pulses
+    long long mms = (long long)(positionUm * PULSES_PER_UM);
 
-//     // 2. 写入目标位置寄存器 0x0024
-//     // 注意: 类型是 INT64 (QWORD)
-//     return m_api_writeQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, (QWORD)mms, TIMEOUT_MS);
-// }
+    // 2. 写入目标位置寄存器 0x0024
+    // 注意: 类型是 INT64 (QWORD)
+    return m_api_writeQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, (QWORD)mms, TIMEOUT_MS);
+}
 
-// // --- 停止运动 ---
-// bool AgeMotionDriver::stopMotion()
-// {
-//     if (!m_isConnected || !m_api_writeWORD) return false;
+// --- 停止运动 ---
+bool AgeMotionDriver::stopMotion()
+{
+    if (!m_isConnected || !m_api_writeWORD) return false;
 
-//     // 写入控制寄存器 0x0000
-//     // 根据手册 4.4.1 [cite: 2430]，Bit 12 是 Stop (停止)
-//     // 0x1000 = 0001 0000 0000 0000 (二进制)
-//     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x1000, TIMEOUT_MS);
-// }
+    // 写入控制寄存器 0x0000
+    // 根据手册 4.4.1 [cite: 2430]，Bit 12 是 Stop (停止)
+    // 0x1000 = 0001 0000 0000 0000 (二进制)
+    return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x1000, TIMEOUT_MS);
+}
 
-// // --- 获取故障码 ---
-// int AgeMotionDriver::checkError()
-// {
-//     if (!m_isConnected || !m_api_readWORD) return -1;
+// --- 获取故障码 ---
+int AgeMotionDriver::checkError()
+{
+    if (!m_isConnected || !m_api_readWORD) return -1;
 
-//     WORD errCode = 0;
-//     // 读取故障寄存器 0x0002 [cite: 2504]
-//     if (m_api_readWORD(STATION_ID, AgeReg::ADDR_ERROR_CODE, errCode, TIMEOUT_MS)) {
-//         return (int)errCode; // 0 表示无故障
-//     }
-//     return -1; // 通讯失败
-// }
+    WORD errCode = 0;
+    // 读取故障寄存器 0x0002 [cite: 2504]
+    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_ERROR_CODE, errCode, TIMEOUT_MS)) {
+        return (int)errCode; // 0 表示无故障
+    }
+    return -1; // 通讯失败
+}
