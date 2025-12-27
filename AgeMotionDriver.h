@@ -130,7 +130,7 @@ private:
 
     // 1. 物理参数
     // 定义：多少个脉冲等于 1 微米
-    static constexpr double PULSES_PER_UM = 1.0;
+    static constexpr double PULSES_PER_UM = 32000.0;
 
     // 2. 通信参数
     // 站号 (RTU Address)
@@ -141,7 +141,7 @@ private:
     // 4. 路径与授权 (使用 constexpr char* 确保在头文件中定义且无链接错误)
     static constexpr const char* DLL_RELATIVE_PATH = "/AgeMotionForDriver/x64/AgeCOM.dll";
     // static constexpr const char* DLL_ABS_PATH = "D:/Project/Git/Git/AutoFocus/AgeMotionForDriver/x64/AgeCOM.dll";
-    static constexpr const char* DLL_ABS_PATH = "D:\\Project\\CHR\\AutoFocus\\AutoFocus\\AgeMotionForDriver\\x64\\AgeCOM.dll";
+    static constexpr const char* DLL_ABS_PATH = "D:\\Project\\CHR\\AutoFocus\\AgeMotionForDriver\\x64\\AgeCOM.dll";
     static constexpr const char* LICENSE_KEY =
         "AgeMotion-20010203-00000000-0000-0000-0000-0000-0000-0000-0000-0000-"
         "0000-0000-0000-0000-0000-0000-0000-0000-0000-0000";
