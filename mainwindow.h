@@ -29,6 +29,15 @@ private slots:
     void on_btnCheckError_clicked();
     void on_testbutton_clicked();
 
+    // 新增测试槽函数
+    void on_btnEnable_clicked(bool checked);
+    void on_btnResetAlarm_clicked();
+    void on_btnEmergencyStop_clicked();
+    void on_btnMoveToLimit_clicked();
+    void on_btnSetZeroOffset_clicked();
+    void on_btnHoming_clicked();
+    void on_btnPulsePos_clicked();
+
     void updateStatus(); // 定时更新状态槽函数
 
 private:

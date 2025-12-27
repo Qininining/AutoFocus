@@ -42,6 +42,53 @@
      </widget>
     </item>
     <item>
+     <layout class="QHBoxLayout" name="horizontalLayout_Info">
+      <item>
+       <widget class="QLabel" name="lblPulse">
+        <property name="text">
+         <string>Pulse: ---</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblCurrent">
+        <property name="text">
+         <string>Current: --- A</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblTemp">
+        <property name="text">
+         <string>Temp: --- C</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QLabel" name="lblStatusInfo">
+      <property name="text">
+       <string>Status: ---</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="styleSheet">
+       <string>color: blue;</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <widget class="QPushButton" name="btnConnect">
       <property name="text">
        <string>Connect Device</string>
@@ -87,6 +134,64 @@
      <widget class="QPushButton" name="btnCheckError">
       <property name="text">
        <string>Check Error</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnEnable">
+      <property name="text">
+       <string>Enable/Disable</string>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnResetAlarm">
+      <property name="text">
+       <string>Reset Alarm</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnEmergencyStop">
+      <property name="text">
+       <string>Emergency Stop</string>
+      </property>
+      <property name="styleSheet">
+       <string>background-color: red; color: white; font-weight: bold;</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnMoveToLimit">
+      <property name="text">
+       <string>Move to Limit Sensor</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnSetZeroOffset">
+      <property name="text">
+       <string>Set Position Offset to Zero</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnHoming">
+      <property name="text">
+       <string>Homing to Encoder Zero</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnPulsePos">
+      <property name="text">
+       <string>Pulse Position Test</string>
       </property>
      </widget>
     </item>

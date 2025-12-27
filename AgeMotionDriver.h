@@ -90,6 +90,37 @@ public:
     bool stopMotion();
     int checkError();
 
+    // --- 新增：控制寄存器功能 ---
+    bool setEnable(bool enable); // 使能/脱机
+    bool resetAlarm();           // 复位报警
+    bool emergencyStop();        // 急停
+    
+    // 运动至传感器
+    bool moveToLimitSensor(bool toUpper); // true=上限位, false=下限位
+    // 位置偏移
+    bool setPositionOffsetToZero();
+    // 回零运动
+    bool homingToEncoderZero(bool toHigh); // true=向高位, false=向低位
+
+    // --- 新增：状态读取 ---
+    bool isMotionComplete(bool &isDone); // 运动完成标志
+    bool isHomingComplete(bool &isDone); // 回零完成标志
+    bool isLimitSensorTriggered(bool &upper, bool &lower); // 限位触发状态
+
+    // --- 新增：脉冲位置功能 (INT32) ---
+    bool getPulsePosition(int &pulses);
+    bool setTargetPulsePosition(int pulses);
+
+    // --- 新增：其他信息读取 ---
+    bool getRealTimeCurrent(double &current); // 获取实时电流 (A)
+    bool getCpuTemperature(int &temp);        // 获取CPU温度 (℃)
+
+    // --- 新增：分辨率与步长 (UINT32) ---
+    bool getSingleToothResolution(unsigned int &res);
+    bool setSingleToothResolution(unsigned int res);
+    bool getPulseStepLength(unsigned int &length);
+    bool setPulseStepLength(unsigned int length);
+
     QString getLastError() const;
 
 private:
@@ -132,11 +163,17 @@ private:
     typedef BOOL32 (*AgeCOMReadWORDFunc)(BYTE, WORD, WORD&, DWORD);
     typedef BOOL32 (*AgeCOMWriteWORDFunc)(BYTE, WORD, WORD, DWORD);
     typedef BOOL32 (*AgeCOMWriteQWORDFunc)(BYTE, WORD, QWORD, DWORD);
+    // 新增 32位读写函数指针类型
+    typedef BOOL32 (*AgeCOMReadDWORDFunc)(BYTE, WORD, DWORD&, DWORD);
+    typedef BOOL32 (*AgeCOMWriteDWORDFunc)(BYTE, WORD, DWORD, DWORD);
 
     // 成员变量
     AgeCOMReadWORDFunc  m_api_readWORD = nullptr;
     AgeCOMWriteWORDFunc m_api_writeWORD = nullptr;
     AgeCOMWriteQWORDFunc m_api_writeQWORD = nullptr;
+    // 新增 32位读写成员
+    AgeCOMReadDWORDFunc m_api_readDWORD = nullptr;
+    AgeCOMWriteDWORDFunc m_api_writeDWORD = nullptr;
 
     AgeCOMIsValidFunc   m_api_isValid = nullptr;
     AgeCOMGetUSBIDFunc  m_api_getUSBID = nullptr;
