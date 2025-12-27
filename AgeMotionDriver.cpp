@@ -63,7 +63,7 @@ bool AgeMotionDriver::loadLibrary()
     m_api_readQWORD = (AgeCOMReadQWORDFunc)m_lib.resolve("AgeCOMReadQWORD");
     m_api_getCOMID  = (AgeCOMGetCOMIDFunc)m_lib.resolve("AgeCOMGetCOMID");
     m_api_setSerial = (AgeCOMSerialFunc)m_lib.resolve("AgeCOMSerial");
-    
+
     // 新增函数指针解析
     m_api_readWORD   = (AgeCOMReadWORDFunc)m_lib.resolve("AgeCOMReadWORD");
     m_api_writeWORD  = (AgeCOMWriteWORDFunc)m_lib.resolve("AgeCOMWriteWORD");
@@ -73,7 +73,7 @@ bool AgeMotionDriver::loadLibrary()
     m_api_writeDWORD = (AgeCOMWriteDWORDFunc)m_lib.resolve("AgeCOMWriteDWORD");
 
     // 校验 (注意：根据实际情况，有些函数可能不是必须的，但为了完整性建议都校验)
-    if (!m_api_isValid || !m_api_readQWORD || !m_api_setSerial || 
+    if (!m_api_isValid || !m_api_readQWORD || !m_api_setSerial ||
         !m_api_readWORD || !m_api_writeWORD || !m_api_writeQWORD ||
         !m_api_readDWORD || !m_api_writeDWORD) {
         m_lastError = "Failed to resolve one or more functions from DLL.";
@@ -202,9 +202,9 @@ bool AgeMotionDriver::setEnable(bool enable)
     // 2. 修改 Bit 0 (假设 Bit 0 为使能位，需根据文档确认)
     // 通常: 1 = Enable, 0 = Disable
     if (enable) {
-        ctrl |= 0x0001;
+        ctrl |= 0x0004;
     } else {
-        ctrl &= ~0x0001;
+        ctrl &= ~0x0004;
     }
 
     // 3. 写回
@@ -213,21 +213,22 @@ bool AgeMotionDriver::setEnable(bool enable)
 
 bool AgeMotionDriver::resetAlarm()
 {
-    if (!m_isConnected || !m_api_readWORD || !m_api_writeWORD) return false;
+    // if (!m_isConnected || !m_api_readWORD || !m_api_writeWORD) return false;
 
-    WORD ctrl = 0;
-    if (!m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS)) return false;
+    // WORD ctrl = 0;
+    // if (!m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS)) return false;
 
-    // 假设 Bit 3 为复位位 (需根据文档确认)
-    ctrl |= 0x0008; 
+    // // 假设 Bit 3 为复位位 (需根据文档确认)
+    // ctrl |= 0x0008;
 
-    return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS);
+    // return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS);
+    return false;
 }
 
 bool AgeMotionDriver::emergencyStop()
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
-    
+
     // 假设 Bit 13 为急停 (Stop 是 Bit 12)
     // 这里直接发送急停指令，不读取旧值以保证速度
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x2000, TIMEOUT_MS);
@@ -236,7 +237,7 @@ bool AgeMotionDriver::emergencyStop()
 bool AgeMotionDriver::moveToLimitSensor(bool toUpper)
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
-    // 假设: Bit 4 = 向上限位运动, Bit 5 = 向下限位运动 (需根据文档确认)
+    //  Bit 4 = 向上限位运动, Bit 5 = 向下限位运动
     WORD cmd = toUpper ? 0x0010 : 0x0020;
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, cmd, TIMEOUT_MS);
 }
@@ -244,55 +245,55 @@ bool AgeMotionDriver::moveToLimitSensor(bool toUpper)
 bool AgeMotionDriver::setPositionOffsetToZero()
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
-    // 假设: Bit 6 = 位置偏移清零 (需根据文档确认)
-    return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x0040, TIMEOUT_MS);
+    //  Bit 8 = 位置偏移清零
+    return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x0100, TIMEOUT_MS);
 }
 
 bool AgeMotionDriver::homingToEncoderZero(bool toHigh)
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
-    // 假设: Bit 7 = 向高位回零, Bit 8 = 向低位回零 (需根据文档确认)
-    WORD cmd = toHigh ? 0x0080 : 0x0100;
+    // Bit 11 = 向高位回零, Bit 10 = 向低位回零
+    WORD cmd = toHigh ? 0x0800 : 0x0400;
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, cmd, TIMEOUT_MS);
 }
 
 bool AgeMotionDriver::isMotionComplete(bool &isDone)
 {
-    if (!m_isConnected || !m_api_readWORD) return false;
-    WORD status = 0;
-    // 读取状态寄存器 (假设地址为 0x0001 或与 Control 共用，需确认)
-    // 这里假设读取 Control 寄存器的反馈状态
-    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, status, TIMEOUT_MS)) {
-        // 假设 Bit 14 为运动完成标志
-        isDone = (status & 0x4000) != 0;
-        return true;
-    }
+    // if (!m_isConnected || !m_api_readWORD) return false;
+    // WORD status = 0;
+    // // 读取状态寄存器 (假设地址为 0x0001 或与 Control 共用，需确认)
+    // // 这里假设读取 Control 寄存器的反馈状态
+    // if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, status, TIMEOUT_MS)) {
+    //     // 假设 Bit 14 为运动完成标志
+    //     isDone = (status & 0x4000) != 0;
+    //     return true;
+    // }
     return false;
 }
 
 bool AgeMotionDriver::isHomingComplete(bool &isDone)
 {
-    if (!m_isConnected || !m_api_readWORD) return false;
-    WORD status = 0;
-    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, status, TIMEOUT_MS)) {
-        // 假设 Bit 15 为回零完成标志
-        isDone = (status & 0x8000) != 0;
-        return true;
-    }
+    // if (!m_isConnected || !m_api_readWORD) return false;
+    // WORD status = 0;
+    // if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, status, TIMEOUT_MS)) {
+    //     // 假设 Bit 15 为回零完成标志
+    //     isDone = (status & 0x8000) != 0;
+    //     return true;
+    // }
     return false;
 }
 
 bool AgeMotionDriver::isLimitSensorTriggered(bool &upper, bool &lower)
 {
-    if (!m_isConnected || !m_api_readWORD) return false;
-    WORD portStatus = 0;
-    // 读取 IO 端口状态 0x0080
-    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_PORT_STATUS, portStatus, TIMEOUT_MS)) {
-        // 假设 Bit 0 = 上限位, Bit 1 = 下限位
-        upper = (portStatus & 0x0001) != 0;
-        lower = (portStatus & 0x0002) != 0;
-        return true;
-    }
+    // if (!m_isConnected || !m_api_readWORD) return false;
+    // WORD portStatus = 0;
+    // // 读取 IO 端口状态 0x0080
+    // if (m_api_readWORD(STATION_ID, AgeReg::ADDR_PORT_STATUS, portStatus, TIMEOUT_MS)) {
+    //     // 假设 Bit 0 = 上限位, Bit 1 = 下限位
+    //     upper = (portStatus & 0x0001) != 0;
+    //     lower = (portStatus & 0x0002) != 0;
+    //     return true;
+    // }
     return false;
 }
 
