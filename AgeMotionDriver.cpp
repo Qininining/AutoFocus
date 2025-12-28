@@ -39,6 +39,14 @@ bool AgeMotionDriver::connectDevice()
 
     m_isConnected = true;
     qDebug() << "✅ AgeMotionDriver: Device connected successfully.";
+
+    // 读取并保存默认目标速度
+    double vel = 0.0;
+    if (getTargetVelocity(vel)) {
+        m_defaultTargetVelocity = vel;
+        qDebug() << "Default Target Velocity saved:" << m_defaultTargetVelocity << "um/s";
+    }
+
     return true;
 }
 
@@ -111,7 +119,7 @@ bool AgeMotionDriver::getPosition(double &positionUm)
         long long signedPulses = (long long)rawPos;
 
         // 2. 转换为微米
-        positionUm = (double)signedPulses / (PULSES_PER_UM);
+        positionUm = (double)signedPulses / (MMS_PER_UM);
 
         return true;
     } else {
@@ -120,47 +128,147 @@ bool AgeMotionDriver::getPosition(double &positionUm)
     }
 }
 
-// --- 获取实时速度 (RPM) ---
-bool AgeMotionDriver::getVelocity(double &rpm)
+bool AgeMotionDriver::getTargetPosition(double &positionUm)
+{
+    if (!m_isConnected || !m_api_readQWORD) {
+        m_lastError = "Driver not connected or function pointer invalid.";
+        return false;
+    }
+
+    QWORD rawPos = 0;
+
+    if (m_api_readQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, rawPos, TIMEOUT_MS)) {
+        long long signedPulses = (long long)rawPos;
+        positionUm = (double)signedPulses / (MMS_PER_UM);
+        return true;
+    } else {
+        m_lastError = "Failed to read QWORD from device.";
+        return false;
+    }
+}
+
+// --- 获取目标速度 (RPM) ---
+bool AgeMotionDriver::getTargetRPM(double &rpm)
 {
     if (!m_isConnected || !m_api_readWORD) return false;
 
     WORD rawVel = 0;
-    // 读取实时速度寄存器 0x0045
-    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_VEL_REAL, rawVel, TIMEOUT_MS)) {
-        // 转换公式: RPM = (5 * raw) / 16 (根据手册 4.4.26)
-        short signedVel = (short)rawVel; // 转为有符号
-        rpm = (signedVel * 5.0) / 16.0;
+    // 读取速度设定寄存器 0x0040
+    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_VEL_SET, rawVel, TIMEOUT_MS)) {
+        // VelSet is UINT16
+        rpm = (rawVel * KV_DEFAULT * 60000) / MMS_PER_R;
         return true;
     }
     return false;
 }
 
 // --- 设置目标运行速度 (RPM) ---
-bool AgeMotionDriver::setTargetVelocity(double rpm)
+bool AgeMotionDriver::setTargetRPM(double rpm)
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
 
     // 转换公式: VelSet = (16 * RPM) / 5 (根据手册 4.4.21)
     // 注意: VelSet 值域 1~38400
-    unsigned short val = (unsigned short)((rpm * 16.0) / 5.0);
+    // unsigned short val = (unsigned short)((rpm * 16.0) / 5.0);
+    WORD val = (WORD)((rpm * MMS_PER_R) / (KV_DEFAULT * 60000));
 
     // 写入速度设定寄存器 0x0040
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_VEL_SET, val, TIMEOUT_MS);
 }
 
+bool AgeMotionDriver::getTargetVelocity(double &velocityUmPerSec)
+{
+    double rpm = 0.0;
+    if (getTargetRPM(rpm)) {
+        // RPM = r/min = r/60s
+        // velocity = (rpm / 60.0) * POSITION_PER_R
+        velocityUmPerSec = (rpm / 60.0) * POSITION_PER_R;
+        return true;
+    }
+    return false;
+}
+
+bool AgeMotionDriver::setTargetVelocity(double velocityUmPerSec)
+{
+    // velocity = (rpm / 60.0) * POSITION_PER_R
+    // rpm = (velocity * 60.0) / POSITION_PER_R
+    double rpm = (velocityUmPerSec * 60.0) / POSITION_PER_R;
+    return setTargetRPM(rpm);
+}
+
+// --- 获取实时速度 (um/s) ---
+bool AgeMotionDriver::getVelocity(double &velocityUmPerSec)
+{
+    if (!m_isConnected || !m_api_readWORD) return false;
+
+    WORD rawVel = 0;
+    // 读取实时速度寄存器 0x0045 (SHORT)
+    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_VEL_REAL, rawVel, TIMEOUT_MS)) {
+        // 转换为有符号 short
+        short signedVel = (short)rawVel;
+        
+        // 转换为 RPM
+        // 公式: RPM = (VelReal * KV * 60000) / MMS_PER_R
+        double rpm = (signedVel * KV_DEFAULT * 60000.0) / MMS_PER_R;
+        
+        // 转换为 um/s
+        velocityUmPerSec = (rpm / 60.0) * POSITION_PER_R;
+        return true;
+    }
+    return false;
+}
+
+// --- 设置恒定运行速度 (Jog模式) ---
+bool AgeMotionDriver::setVelocity(double velocityUmPerSec)
+{
+    // 速度为0则停止
+    if (qAbs(velocityUmPerSec) < 0.001) {
+        return stopMotion();
+    }
+
+    // 1. 设置运行速度 (取绝对值)
+    if (!setTargetVelocity(qAbs(velocityUmPerSec))) return false;
+
+    // 2. 设置目标位置为极大值 (模拟恒定运行)
+    // 正速度 -> 正无穷, 负速度 -> 负无穷
+    // 假设 100米 (100,000,000 um) 足够远
+    double targetPos = (velocityUmPerSec > 0) ? 100000000.0 : -100000000.0;
+    
+    // 手动写入位置寄存器，避免调用 setTargetPosition (因为它会恢复默认速度)
+    if (!m_isConnected || !m_api_writeQWORD) return false;
+    
+    long long mms = (long long)(targetPos * MMS_PER_UM);
+    return m_api_writeQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, (QWORD)mms, TIMEOUT_MS);
+}
+
 // --- 绝对运动到指定位置 (微米) ---
-bool AgeMotionDriver::moveToPosition(double positionUm)
+bool AgeMotionDriver::setTargetPosition(double positionUm)
 {
     if (!m_isConnected || !m_api_writeQWORD) return false;
 
+    // 恢复默认速度 (防止之前调用 setVelocity 修改了速度)
+    if (m_defaultTargetVelocity > 0.001) {
+        setTargetVelocity(m_defaultTargetVelocity);
+    }
+
     // 1. 将微米转换为脉冲/微步 (MMS)
-    // 1 um = PULSES_PER_UM pulses
-    long long mms = (long long)(positionUm * PULSES_PER_UM);
+    // 1 um = MMS_PER_UM 
+    long long mms = (long long)(positionUm * MMS_PER_UM);
 
     // 2. 写入目标位置寄存器 0x0024
     // 注意: 类型是 INT64 (QWORD)
     return m_api_writeQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, (QWORD)mms, TIMEOUT_MS);
+}
+
+// --- 相对运动 (微米) ---
+bool AgeMotionDriver::setRelativePosition(double deltaUm)
+{
+    double targetPos = 0.0;
+    // 1. 获取当前目标位置 (基于上一次的目标位置进行增量，避免多次累积误差或运动中修改)
+    if (!getTargetPosition(targetPos)) return false;
+    
+    // 2. 计算目标位置并执行绝对运动
+    return setTargetPosition(targetPos + deltaUm);
 }
 
 // --- 停止运动 ---
@@ -199,7 +307,8 @@ bool AgeMotionDriver::setEnable(bool enable)
     // 1. 读取当前控制字
     if (!m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS)) return false;
 
-    // 2. 修改 Bit 0 (假设 Bit 0 为使能位，需根据文档确认)
+    // 2. 修改 Bit 2 使能位
+    // 0x0004 = 0000 0000 0000 0100 (二进制)
     // 通常: 1 = Enable, 0 = Disable
     if (enable) {
         ctrl |= 0x0004;
@@ -211,75 +320,73 @@ bool AgeMotionDriver::setEnable(bool enable)
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS);
 }
 
-bool AgeMotionDriver::resetAlarm()
-{
-    // if (!m_isConnected || !m_api_readWORD || !m_api_writeWORD) return false;
-
-    // WORD ctrl = 0;
-    // if (!m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS)) return false;
-
-    // // 假设 Bit 3 为复位位 (需根据文档确认)
-    // ctrl |= 0x0008;
-
-    // return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS);
-    return false;
-}
-
 bool AgeMotionDriver::emergencyStop()
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
 
     // 假设 Bit 13 为急停 (Stop 是 Bit 12)
+    // 0x2000 = 0010 0000 0000 0000 (二进制)
     // 这里直接发送急停指令，不读取旧值以保证速度
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x2000, TIMEOUT_MS);
 }
 
-bool AgeMotionDriver::moveToLimitSensor(bool toUpper)
+bool AgeMotionDriver::moveToLimit(bool toUpper)
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
     //  Bit 4 = 向上限位运动, Bit 5 = 向下限位运动
+    // 0x0010 = 0000 0000 0001 0000 (二进制)
+    // 0x0020 = 0000 0000 0010 0000 (二进制)
     WORD cmd = toUpper ? 0x0010 : 0x0020;
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, cmd, TIMEOUT_MS);
 }
 
-bool AgeMotionDriver::setPositionOffsetToZero()
+bool AgeMotionDriver::setCurrPositionToZero()
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
     //  Bit 8 = 位置偏移清零
+    // 0x0100 = 0000 0001 0000 0000 (二进制)
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, 0x0100, TIMEOUT_MS);
 }
 
-bool AgeMotionDriver::homingToEncoderZero(bool toHigh)
+bool AgeMotionDriver::findReference(bool toHigh)
 {
     if (!m_isConnected || !m_api_writeWORD) return false;
     // Bit 11 = 向高位回零, Bit 10 = 向低位回零
+    // 0x0800 = 0000 1000 0000 0000 (二进制)
+    // 0x0400 = 0000 0100 0000 0000 (二进制)
     WORD cmd = toHigh ? 0x0800 : 0x0400;
     return m_api_writeWORD(STATION_ID, AgeReg::ADDR_CONTROL, cmd, TIMEOUT_MS);
 }
 
 bool AgeMotionDriver::isMotionComplete(bool &isDone)
 {
-    // if (!m_isConnected || !m_api_readWORD) return false;
-    // WORD status = 0;
-    // // 读取状态寄存器 (假设地址为 0x0001 或与 Control 共用，需确认)
-    // // 这里假设读取 Control 寄存器的反馈状态
-    // if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, status, TIMEOUT_MS)) {
-    //     // 假设 Bit 14 为运动完成标志
-    //     isDone = (status & 0x4000) != 0;
-    //     return true;
-    // }
-    return false;
+    if (!m_isConnected || !m_api_readQWORD) return false;
+
+    QWORD realPos = 0;
+    QWORD targetPos = 0;
+
+    // 读取实时位置和目标位置
+    if (!m_api_readQWORD(STATION_ID, AgeReg::ADDR_POS_REAL, realPos, TIMEOUT_MS)) return false;
+    if (!m_api_readQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, targetPos, TIMEOUT_MS)) return false;
+
+    long long diff = (long long)realPos - (long long)targetPos;
+    if (diff < 0) diff = -diff;
+
+    // 阈值设定
+    isDone = (diff < MMS_PER_UM/2); // 允许半微米误差
+    return true;
 }
 
 bool AgeMotionDriver::isHomingComplete(bool &isDone)
 {
-    // if (!m_isConnected || !m_api_readWORD) return false;
-    // WORD status = 0;
-    // if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, status, TIMEOUT_MS)) {
-    //     // 假设 Bit 15 为回零完成标志
-    //     isDone = (status & 0x8000) != 0;
-    //     return true;
-    // }
+    if (!m_isConnected || !m_api_readWORD) return false;
+    WORD ctrl = 0;
+    if (m_api_readWORD(STATION_ID, AgeReg::ADDR_CONTROL, ctrl, TIMEOUT_MS)) {
+        // 如果 Bit 10 和 Bit 11 都是 0，则动作完成
+        // 0x0C00 = 0000 1100 0000 0000
+        isDone = ((ctrl & 0x0C00) == 0);
+        return true;
+    }
     return false;
 }
 
@@ -364,12 +471,6 @@ bool AgeMotionDriver::getSingleToothResolution(unsigned int &res)
     return false;
 }
 
-bool AgeMotionDriver::setSingleToothResolution(unsigned int res)
-{
-    if (!m_isConnected || !m_api_writeDWORD) return false;
-    return m_api_writeDWORD(STATION_ID, AgeReg::ADDR_T_RESOLUTION, (DWORD)res, TIMEOUT_MS);
-}
-
 bool AgeMotionDriver::getPulseStepLength(unsigned int &length)
 {
     if (!m_isConnected || !m_api_readDWORD) return false;
@@ -386,4 +487,20 @@ bool AgeMotionDriver::setPulseStepLength(unsigned int length)
 {
     if (!m_isConnected || !m_api_writeDWORD) return false;
     return m_api_writeDWORD(STATION_ID, AgeReg::ADDR_PULSE_LENGTH, (DWORD)length, TIMEOUT_MS);
+}
+
+bool AgeMotionDriver::getMinStepUm(double &stepUm)
+{
+    unsigned int pulses = 0;
+    if (getPulseStepLength(pulses)) {
+        stepUm = (double)pulses / MMS_PER_UM;
+        return true;
+    }
+    return false;
+}
+
+bool AgeMotionDriver::setMinStepUm(double stepUm)
+{
+    unsigned int pulses = (unsigned int)(stepUm * MMS_PER_UM);
+    return setPulseStepLength(pulses);
 }

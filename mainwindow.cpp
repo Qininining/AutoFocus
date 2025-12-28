@@ -43,7 +43,7 @@ void MainWindow::on_btnSetVel_clicked()
     bool ok;
     double vel = QInputDialog::getDouble(this, "Set Velocity", "Enter velocity (RPM):", 60, 0, 3000, 1, &ok);
     if (ok) {
-        if (m_driver->setTargetVelocity(vel)) {
+        if (m_driver->setTargetRPM(vel)) {
             QMessageBox::information(this, "Success", QString("Velocity set to %1 RPM").arg(vel));
         } else {
             QMessageBox::warning(this, "Error", "Failed to set velocity: " + m_driver->getLastError());
@@ -56,10 +56,23 @@ void MainWindow::on_btnMove_clicked()
     bool ok;
     double pos = QInputDialog::getDouble(this, "Move to Position", "Enter position (um):", 0, -100000, 100000, 1, &ok);
     if (ok) {
-        if (m_driver->moveToPosition(pos)) {
+        if (m_driver->setTargetPosition(pos)) {
             qDebug() << "Moving to" << pos << "um";
         } else {
             QMessageBox::warning(this, "Error", "Failed to move: " + m_driver->getLastError());
+        }
+    }
+}
+
+void MainWindow::on_btnMoveRel_clicked()
+{
+    bool ok;
+    double delta = QInputDialog::getDouble(this, "Move Relative", "Enter distance (um):", 0, -100000, 100000, 1, &ok);
+    if (ok) {
+        if (m_driver->setRelativePosition(delta)) {
+            qDebug() << "Moving relative by" << delta << "um";
+        } else {
+            QMessageBox::warning(this, "Error", "Failed to move relative: " + m_driver->getLastError());
         }
     }
 }
@@ -86,8 +99,8 @@ void MainWindow::on_btnGetPos_clicked()
 void MainWindow::on_btnGetVel_clicked()
 {
     double vel = 0;
-    if (m_driver->getVelocity(vel)) {
-        QMessageBox::information(this, "Velocity", QString("Current Velocity: %1 RPM").arg(vel));
+    if (m_driver->getTargetRPM(vel)) {
+        QMessageBox::information(this, "Velocity", QString("Target Velocity: %1 RPM").arg(vel));
     } else {
         QMessageBox::warning(this, "Error", "Failed to get velocity: " + m_driver->getLastError());
     }
@@ -125,15 +138,6 @@ void MainWindow::on_btnEnable_clicked(bool checked)
     }
 }
 
-void MainWindow::on_btnResetAlarm_clicked()
-{
-    if (m_driver->resetAlarm()) {
-        QMessageBox::information(this, "Success", "Alarm reset command sent.");
-    } else {
-        QMessageBox::warning(this, "Error", "Failed to reset alarm.");
-    }
-}
-
 void MainWindow::on_btnEmergencyStop_clicked()
 {
     if (m_driver->emergencyStop()) {
@@ -151,7 +155,7 @@ void MainWindow::on_btnMoveToLimit_clicked()
     QString item = QInputDialog::getItem(this, "Move to Limit", "Select Direction:", items, 0, false, &ok);
     if (ok && !item.isEmpty()) {
         bool toUpper = (item == "Upper Limit");
-        if (m_driver->moveToLimitSensor(toUpper)) {
+        if (m_driver->moveToLimit(toUpper)) {
             qDebug() << "Moving to" << item;
         } else {
             QMessageBox::warning(this, "Error", "Failed to move to limit sensor.");
@@ -162,7 +166,7 @@ void MainWindow::on_btnMoveToLimit_clicked()
 void MainWindow::on_btnSetZeroOffset_clicked()
 {
     if (QMessageBox::question(this, "Confirm", "Set current position offset to zero?", QMessageBox::Yes|QMessageBox::No) == QMessageBox::Yes) {
-        if (m_driver->setPositionOffsetToZero()) {
+        if (m_driver->setCurrPositionToZero()) {
             QMessageBox::information(this, "Success", "Position offset set to zero.");
         } else {
             QMessageBox::warning(this, "Error", "Failed to set position offset.");
@@ -178,7 +182,7 @@ void MainWindow::on_btnHoming_clicked()
     QString item = QInputDialog::getItem(this, "Homing", "Select Homing Direction:", items, 0, false, &ok);
     if (ok && !item.isEmpty()) {
         bool toHigh = (item == "To High (Positive)");
-        if (m_driver->homingToEncoderZero(toHigh)) {
+        if (m_driver->findReference(toHigh)) {
             qDebug() << "Homing " << item;
         } else {
             QMessageBox::warning(this, "Error", "Failed to start homing.");
@@ -218,8 +222,13 @@ void MainWindow::updateStatus()
     }
 
     double vel = 0;
-    if (m_driver->getVelocity(vel)) {
-        ui->lblVelocity->setText(QString("Velocity: %1 RPM").arg(vel, 0, 'f', 2));
+    if (m_driver->getTargetRPM(vel)) {
+        ui->lblVelocity->setText(QString("Target Velocity: %1 RPM").arg(vel, 0, 'f', 2));
+    }
+
+    double realVel = 0;
+    if (m_driver->getVelocity(realVel)) {
+        ui->lblRealVelocity->setText(QString("Real Velocity: %1 um/s").arg(realVel, 0, 'f', 2));
     }
 
     // 2. 扩展信息 (脉冲、电流、温度)
@@ -270,4 +279,86 @@ void MainWindow::updateStatus()
          ui->statusbar->clearMessage();
     }
 }
+
+void MainWindow::on_btnTestResolution_clicked()
+{
+    unsigned int currentRes = 0;
+    if (m_driver->getSingleToothResolution(currentRes)) {
+        QMessageBox::information(this, "Single Tooth Resolution", 
+            QString("Current Resolution: %1").arg(currentRes));
+    } else {
+        QMessageBox::warning(this, "Error", "Failed to read resolution.");
+    }
+}
+
+void MainWindow::on_btnTestPulseStep_clicked()
+{
+    double currentStepUm = 0.0;
+    if (m_driver->getMinStepUm(currentStepUm)) {
+        bool ok;
+        double newStepUm = QInputDialog::getDouble(this, "Min Step Length (um)",
+            QString("Current Step Length: %1 um\nEnter new step length (um):").arg(currentStepUm),
+            currentStepUm, 0.001, 1000.0, 3, &ok);
+
+        if (ok) {
+            if (m_driver->setMinStepUm(newStepUm)) {
+                QMessageBox::information(this, "Success", QString("Min Step Length set to %1 um").arg(newStepUm));
+            } else {
+                QMessageBox::warning(this, "Error", "Failed to set min step length.");
+            }
+        }
+    } else {
+        QMessageBox::warning(this, "Error", "Failed to read min step length.");
+    }
+}
+
+void MainWindow::on_btnGetTargetVelUm_clicked()
+{
+    double vel = 0;
+    if (m_driver->getTargetVelocity(vel)) {
+        QMessageBox::information(this, "Target Velocity", QString("Target Velocity: %1 um/s").arg(vel));
+    } else {
+        QMessageBox::warning(this, "Error", "Failed to get target velocity: " + m_driver->getLastError());
+    }
+}
+
+void MainWindow::on_btnSetTargetVelUm_clicked()
+{
+    bool ok;
+    double vel = QInputDialog::getDouble(this, "Set Target Velocity", "Enter velocity (um/s):", 1000, 0, 100000, 1, &ok);
+    if (ok) {
+        if (m_driver->setTargetVelocity(vel)) {
+            QMessageBox::information(this, "Success", QString("Target Velocity set to %1 um/s").arg(vel));
+        } else {
+            QMessageBox::warning(this, "Error", "Failed to set target velocity: " + m_driver->getLastError());
+        }
+    }
+}
+
+void MainWindow::on_btnSetJogVel_clicked()
+{
+    bool ok;
+    double vel  = QInputDialog::getDouble(this, "Set Jog Velocity", "Enter velocity (um/s):", 0, -100000, 100000, 1, &ok);
+    if (ok) {
+        if (m_driver->setVelocity(vel)) {
+            if (qAbs(vel) < 0.001)
+                qDebug() << "Jog Motion Stopped.";
+            else
+                qDebug() << "Jogging at" << vel << "um/s";
+        } else {
+            QMessageBox::warning(this, "Error", "Failed to set jog velocity: " + m_driver->getLastError());
+        }
+    }
+}
+
+void MainWindow::on_btnGetRealVel_clicked()
+{
+    double vel = 0;
+    if (m_driver->getVelocity(vel)) {
+        QMessageBox::information(this, "Real Velocity", QString("Real Velocity: %1 um/s").arg(vel));
+    } else {
+        QMessageBox::warning(this, "Error", "Failed to get real velocity: " + m_driver->getLastError());
+    }
+}
+
 

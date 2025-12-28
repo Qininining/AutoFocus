@@ -42,6 +42,19 @@
      </widget>
     </item>
     <item>
+     <widget class="QLabel" name="lblRealVelocity">
+      <property name="text">
+       <string>Real Velocity: --- um/s</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="styleSheet">
+       <string>font-size: 12pt; color: green;</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <layout class="QHBoxLayout" name="horizontalLayout_Info">
       <item>
        <widget class="QLabel" name="lblPulse">
@@ -105,7 +118,14 @@
     <item>
      <widget class="QPushButton" name="btnMove">
       <property name="text">
-       <string>Move to Position</string>
+       <string>Move to Position (Abs)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnMoveRel">
+      <property name="text">
+       <string>Move Relative (Rel)</string>
       </property>
      </widget>
     </item>
@@ -151,13 +171,6 @@
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="btnResetAlarm">
-      <property name="text">
-       <string>Reset Alarm</string>
-      </property>
-     </widget>
-    </item>
-    <item>
      <widget class="QPushButton" name="btnEmergencyStop">
       <property name="text">
        <string>Emergency Stop</string>
@@ -192,6 +205,48 @@
      <widget class="QPushButton" name="btnPulsePos">
       <property name="text">
        <string>Pulse Position Test</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnTestResolution">
+      <property name="text">
+       <string>Test Resolution</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnTestPulseStep">
+      <property name="text">
+       <string>Test Pulse Step</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnGetTargetVelUm">
+      <property name="text">
+       <string>Get Target Velocity (um/s)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnSetTargetVelUm">
+      <property name="text">
+       <string>Set Target Velocity (um/s)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnSetJogVel">
+      <property name="text">
+       <string>Set Jog Velocity (Constant Run)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="btnGetRealVel">
+      <property name="text">
+       <string>Get Real Velocity (um/s)</string>
       </property>
      </widget>
     </item>

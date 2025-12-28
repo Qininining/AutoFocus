@@ -23,6 +23,7 @@ private slots:
     void on_btnConnect_clicked();
     void on_btnSetVel_clicked();
     void on_btnMove_clicked();
+    void on_btnMoveRel_clicked();
     void on_btnStop_clicked();
     void on_btnGetPos_clicked();
     void on_btnGetVel_clicked();
@@ -31,12 +32,17 @@ private slots:
 
     // 新增测试槽函数
     void on_btnEnable_clicked(bool checked);
-    void on_btnResetAlarm_clicked();
     void on_btnEmergencyStop_clicked();
     void on_btnMoveToLimit_clicked();
     void on_btnSetZeroOffset_clicked();
     void on_btnHoming_clicked();
     void on_btnPulsePos_clicked();
+    void on_btnTestResolution_clicked();
+    void on_btnTestPulseStep_clicked();
+    void on_btnGetTargetVelUm_clicked();
+    void on_btnSetTargetVelUm_clicked();
+    void on_btnSetJogVel_clicked();
+    void on_btnGetRealVel_clicked();
 
     void updateStatus(); // 定时更新状态槽函数
 
