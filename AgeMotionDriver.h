@@ -80,54 +80,47 @@ public:
 
     bool connectDevice();
 
-    // 注意：这里现在的单位是 微米 (μm)
-    bool getPosition(double &positionUm);
-    bool getTargetPosition(double &positionUm); // 获取目标位置
-    
-    // 新增功能函数
+    // --- 位置相关接口 ---
+    bool getPosition(double &positionUm); // 获取实时位置
+    bool getTargetPosition(double &positionUm); // 获取期望位置
+    bool setTargetPosition(double positionUm); // 绝对运动到指定位置
+    bool setRelativePosition(double deltaUm);   // 相对运动
+
+    // 设置位置控制时的速度
     bool getTargetRPM(double &rpm);
     bool setTargetRPM(double rpm);
-    bool getTargetVelocity(double &velocityUmPerSec);
-    bool setTargetVelocity(double velocityUmPerSec);
-    
-    // 恒定速度运行
+    bool getTargetVelocity(double &velocityUmPerSec); // 获取期望速度
+    bool setTargetVelocity(double velocityUmPerSec); // 设置期望速度
     bool getVelocity(double &velocityUmPerSec); // 获取实时速度
     bool setVelocity(double velocityUmPerSec);  // 设置恒定运行速度
-
-    bool setTargetPosition(double positionUm);
-    bool setRelativePosition(double deltaUm);   // 相对运动
+    
     bool stopMotion();
     int checkError();
-
-    // --- 新增：控制寄存器功能 ---
     bool setEnable(bool enable); // 使能/脱机
     bool emergencyStop();        // 急停
-    
-    // 运动至传感器
+
     bool moveToLimit(bool toUpper); // true=上限位, false=下限位
-    // 位置偏移
     bool setCurrPositionToZero();
-    // 回零运动
     bool findReference(bool toHigh); // true=向高位, false=向低位
 
-    // --- 新增：状态读取 ---
+    // --- 状态读取 ---
     bool isMotionComplete(bool &isDone); // 运动完成标志
     bool isHomingComplete(bool &isDone); // 回零完成标志
     bool isLimitSensorTriggered(bool &upper, bool &lower); // 限位触发状态
 
-    // --- 新增：脉冲位置功能 (INT32) ---
+    // --- 脉冲位置功能 (INT32) ---
     bool getPulsePosition(int &pulses);
     bool setTargetPulsePosition(int pulses);
 
-    // --- 新增：其他信息读取 ---
+    // --- 其他信息读取 ---
     bool getRealTimeCurrent(double &current); // 获取实时电流 (A)
     bool getCpuTemperature(int &temp);        // 获取CPU温度 (℃)
 
-    // --- 新增：分辨率与步长 (UINT32) ---
+    // --- 分辨率与步长 (UINT32) ---
     bool getSingleToothResolution(unsigned int &res);
     bool getPulseStepLength(unsigned int &length);
     bool setPulseStepLength(unsigned int length);
-    
+
     // 最小步长 (μm)
     bool getMinStepUm(double &stepUm);
     bool setMinStepUm(double stepUm);
@@ -146,7 +139,7 @@ private:
     static constexpr double KV_DEFAULT = 20.0; // 默认电机速度系数，固定值
     static constexpr double MMS_PER_R = TResolution_Default * TEETH_COUNT; // 每转微步数
     static constexpr double MMS_PER_UM = MMS_PER_R / POSITION_PER_R; // 最小细分步 每微米
-    
+
 
     // 2. 通信参数
     // 站号 (RTU Address)

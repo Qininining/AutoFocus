@@ -206,11 +206,11 @@ bool AgeMotionDriver::getVelocity(double &velocityUmPerSec)
     if (m_api_readWORD(STATION_ID, AgeReg::ADDR_VEL_REAL, rawVel, TIMEOUT_MS)) {
         // 转换为有符号 short
         short signedVel = (short)rawVel;
-        
+
         // 转换为 RPM
         // 公式: RPM = (VelReal * KV * 60000) / MMS_PER_R
         double rpm = (signedVel * KV_DEFAULT * 60000.0) / MMS_PER_R;
-        
+
         // 转换为 um/s
         velocityUmPerSec = (rpm / 60.0) * POSITION_PER_R;
         return true;
@@ -233,10 +233,10 @@ bool AgeMotionDriver::setVelocity(double velocityUmPerSec)
     // 正速度 -> 正无穷, 负速度 -> 负无穷
     // 假设 100米 (100,000,000 um) 足够远
     double targetPos = (velocityUmPerSec > 0) ? 100000000.0 : -100000000.0;
-    
+
     // 手动写入位置寄存器，避免调用 setTargetPosition (因为它会恢复默认速度)
     if (!m_isConnected || !m_api_writeQWORD) return false;
-    
+
     long long mms = (long long)(targetPos * MMS_PER_UM);
     return m_api_writeQWORD(STATION_ID, AgeReg::ADDR_POS_TARGET, (QWORD)mms, TIMEOUT_MS);
 }
@@ -252,7 +252,7 @@ bool AgeMotionDriver::setTargetPosition(double positionUm)
     }
 
     // 1. 将微米转换为脉冲/微步 (MMS)
-    // 1 um = MMS_PER_UM 
+    // 1 um = MMS_PER_UM
     long long mms = (long long)(positionUm * MMS_PER_UM);
 
     // 2. 写入目标位置寄存器 0x0024
@@ -266,7 +266,7 @@ bool AgeMotionDriver::setRelativePosition(double deltaUm)
     double targetPos = 0.0;
     // 1. 获取当前目标位置 (基于上一次的目标位置进行增量，避免多次累积误差或运动中修改)
     if (!getTargetPosition(targetPos)) return false;
-    
+
     // 2. 计算目标位置并执行绝对运动
     return setTargetPosition(targetPos + deltaUm);
 }
